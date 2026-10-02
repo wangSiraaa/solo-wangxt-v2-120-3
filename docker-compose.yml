@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: teachloc
+      POSTGRES_PASSWORD: teachloc
+      POSTGRES_DB: teachloc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/postgis.sql:/docker-entrypoint-initdb.d/postgis.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teachloc"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://teachloc:teachloc@db:5432/teachloc
+      DATA_VERSION: synth-v1.0
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
