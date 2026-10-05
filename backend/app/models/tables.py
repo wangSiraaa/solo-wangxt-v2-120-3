@@ -76,6 +76,31 @@ class Pick(Base):
 
     station: Mapped[Station] = relationship(back_populates="picks")
     scenario: Mapped[Scenario] = relationship(back_populates="picks")
+    revisions: Mapped[list["PickRevision"]] = relationship(
+        back_populates="pick", cascade="all, delete-orphan", order_by="PickRevision.id")
+
+
+class PickRevision(Base):
+    """人工修订/撤销的操作记录：只追加、不修改，供课堂复盘「到时是怎样被改过的」。
+
+    old/new 记录的是**有效到时**（COALESCE(manual, raw)）在操作前后的取值与来源，
+    因此撤销记录能直接读出「有效到时回到 raw」。raw_* 字段本身永不被写，
+    定位也仍只读当前有效到时；本表不参与定位输入，已保存的候选解快照不受影响。
+    """
+    __tablename__ = "pick_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pick_id: Mapped[int] = mapped_column(ForeignKey("picks.id"), index=True)
+    action: Mapped[str] = mapped_column(String(8))                # revise / undo
+    old_time_epoch: Mapped[float | None] = mapped_column(Float, nullable=True)
+    new_time_epoch: Mapped[float | None] = mapped_column(Float, nullable=True)
+    old_source: Mapped[str] = mapped_column(String(8), default="")  # manual/raw/missing
+    new_source: Mapped[str] = mapped_column(String(8), default="")
+    author: Mapped[str] = mapped_column(String(64), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    pick: Mapped[Pick] = relationship(back_populates="revisions")
 
 
 class LocationRun(Base):

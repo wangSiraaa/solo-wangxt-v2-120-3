@@ -65,6 +65,22 @@ class ManualPickIn(BaseModel):
     author: str = "student"
 
 
+class PickRevisionOut(BaseModel):
+    """一条人工修订/撤销操作记录（前后值为有效到时 COALESCE(manual, raw)）。"""
+    id: int
+    pick_id: int
+    station_code: str
+    phase: str
+    action: str                      # revise | undo
+    old_time_epoch: Optional[float]  # 操作前有效到时
+    new_time_epoch: Optional[float]  # 操作后有效到时（撤销后 = raw）
+    old_source: str                  # manual | raw | missing
+    new_source: str
+    author: str
+    note: str
+    created_at: datetime
+
+
 class LocateRequest(BaseModel):
     scenario_key: str
     phase: str = Field(pattern="^[PpSs]$", description="单次定位只允许单一震相")

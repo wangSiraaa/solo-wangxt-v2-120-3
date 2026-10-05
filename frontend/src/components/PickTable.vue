@@ -37,6 +37,7 @@
               <button v-if="p.manual_time_epoch!=null" class="sm danger" @click="$emit('clear',p.id)">
                 撤销修订
               </button>
+              <button class="sm" @click="$emit('history', p)">记录</button>
             </td>
           </tr>
         </tbody>
@@ -48,7 +49,7 @@
 <script setup>
 import { fmtEpoch } from '../lib/api.js'
 defineProps({ picks: { type: Array, default: () => [] } })
-defineEmits(['clear'])
+defineEmits(['clear', 'history'])
 const sourceLabel = { raw: '原始', manual: '人工', missing: '缺测' }
 function resClass(v) {
   if (v == null) return 'res-ok'

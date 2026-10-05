@@ -129,6 +129,20 @@ tr.missing td { color: var(--muted); }
 
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-pickhist { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+
+/* 修订时间线 */
+.rev-item {
+  display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap;
+  padding: 4px 0; border-bottom: 1px dashed var(--border); font-size: 12px;
+}
+.rev-item:last-child { border-bottom: none; }
+.rev-seq { color: var(--muted); min-width: 26px; }
+.rev-change { font-size: 11.5px; }
+.rev-time { margin-left: auto; font-size: 11px; }
+.src-raw { color: var(--muted); }
+.src-manual { color: var(--good); }
+.src-missing { color: var(--bad); }
 .muted { color: var(--muted); font-size: 11.5px; }
 .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .warnbox {

@@ -25,7 +25,12 @@ export const api = {
   revisePick: (id, body) => req(`/scenarios/picks/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
-  clearManual: (id) => req(`/scenarios/picks/${id}/manual`, { method: 'DELETE' }),
+  clearManual: (id, params = {}) => {
+    const q = new URLSearchParams(params).toString()
+    return req(`/scenarios/picks/${id}/manual${q ? '?' + q : ''}`, { method: 'DELETE' })
+  },
+  pickHistory: (id) => req(`/scenarios/picks/${id}/history`),
+  scenarioRevisions: (key) => req(`/scenarios/${key}/revisions`),
   locate: (body) => req('/scenarios/locate', {
     method: 'POST', body: JSON.stringify(body),
   }),

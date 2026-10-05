@@ -66,10 +66,14 @@
                      :runs="runs" :selected-run="selectedRun" />
         <WaveformViewer :key="'wf-'+scenarioKey" :scenario-key="scenarioKey"
                         :station-codes="scenarioStations.map(s=>s.code)"
-                        :picks="picks" @revised="loadPicks" />
+                        :picks="picks" @revised="onRevised" />
       </div>
 
-      <PickTable :picks="picks" @clear="clearManual" />
+      <div class="grid-pickhist">
+        <PickTable :picks="picks" @clear="clearManual" @history="showHistory" />
+        <RevisionTimeline :revisions="revisions" :filter-pick="historyPick"
+                          @reset-filter="resetHistoryFilter" />
+      </div>
 
       <div class="footer-note">
         P、S 震相分别独立定位，严禁混用同一残差向量；残差 = 观测到时 − 理论到时；
@@ -85,6 +89,7 @@ import { api, fmtEpoch } from './lib/api.js'
 import GeometryMap from './components/GeometryMap.vue'
 import WaveformViewer from './components/WaveformViewer.vue'
 import PickTable from './components/PickTable.vue'
+import RevisionTimeline from './components/RevisionTimeline.vue'
 import LocationPanel from './components/LocationPanel.vue'
 import { DATA_VERSION_CONST } from './lib/versions.js'
 
@@ -95,6 +100,8 @@ const scenarioKey = ref('nominal')
 const picks = ref([])
 const runs = ref([])
 const selectedRun = ref(null)
+const revisions = ref([])
+const historyPick = ref(null)   // 非 null 时时间线只显示该拾取的记录
 const pickVersionInfo = ref({ pick_data_version: '', n_picks: 0, n_manual: 0, n_missing: 0 })
 
 const dataVersion = DATA_VERSION_CONST
@@ -122,12 +129,33 @@ watch(scenarioKey, loadScenario, { immediate: true })
 
 async function loadScenario() {
   selectedRun.value = null
-  await Promise.all([loadPicks(), loadRuns()])
+  historyPick.value = null
+  await Promise.all([loadPicks(), loadRuns(), loadRevisions()])
 }
 
 async function loadPicks() {
   picks.value = await api.picks(scenarioKey.value)
   pickVersionInfo.value = await api.picksVersion(scenarioKey.value)
+}
+
+async function loadRevisions() {
+  revisions.value = historyPick.value
+    ? await api.pickHistory(historyPick.value.id)
+    : await api.scenarioRevisions(scenarioKey.value)
+}
+
+async function onRevised() {
+  await Promise.all([loadPicks(), loadRevisions()])
+}
+
+async function showHistory(pick) {
+  historyPick.value = pick
+  await loadRevisions()
+}
+
+async function resetHistoryFilter() {
+  historyPick.value = null
+  await loadRevisions()
 }
 
 async function loadRuns() {
@@ -144,7 +172,7 @@ async function onLocated(created) {
 }
 
 async function clearManual(id) {
-  await api.clearManual(id)
-  await loadPicks()
+  await api.clearManual(id, { author: 'student', note: '撤销修订' })
+  await onRevised()
 }
 </script>
