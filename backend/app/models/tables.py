@@ -4,6 +4,10 @@
   raw_time_epoch / raw_status 由自动拾取（此处为合成发生器）写入，**永不修改**；
   manual_time_epoch / manual_note / manual_author 由用户修订单独保存。
 定位输入采用 COALESCE(manual, raw)，并在 runs.input_snapshot 中留痕。
+
+PickRevision 是人工修订/撤销的**只增不改**操作记录（教学审计日志）：
+每次修订或撤销追加一行，保存 manual 字段的前后值、作者、备注与时间。
+定位与候选解快照都不读取它——它只用于授课复盘"某个到时是怎样被改过的"。
 """
 from __future__ import annotations
 
@@ -76,6 +80,32 @@ class Pick(Base):
 
     station: Mapped[Station] = relationship(back_populates="picks")
     scenario: Mapped[Scenario] = relationship(back_populates="picks")
+    revisions: Mapped[list["PickRevision"]] = relationship(
+        back_populates="pick", cascade="all, delete-orphan",
+        order_by="PickRevision.id",
+    )
+
+
+class PickRevision(Base):
+    """一次人工修订/撤销的操作记录（只追加、不修改、不删除）。
+
+    old/new_time_epoch 记录的是 manual 字段的前后值：
+      revise：old 为修订前 manual（None 表示此前一直用 raw），new 为新 manual；
+      clear ：old 为被撤销的 manual，new 恒为 None（有效到时回到 raw）。
+    raw_* 从不出现在这里——原始拾取只读，不存在"改前改后"。
+    """
+    __tablename__ = "pick_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pick_id: Mapped[int] = mapped_column(ForeignKey("picks.id"), index=True)
+    action: Mapped[str] = mapped_column(String(8))  # revise | clear
+    old_time_epoch: Mapped[float | None] = mapped_column(Float, nullable=True)
+    new_time_epoch: Mapped[float | None] = mapped_column(Float, nullable=True)
+    author: Mapped[str] = mapped_column(String(64), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    pick: Mapped[Pick] = relationship(back_populates="revisions")
 
 
 class LocationRun(Base):

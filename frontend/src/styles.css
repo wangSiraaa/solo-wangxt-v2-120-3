@@ -147,4 +147,19 @@ tr.missing td { color: var(--muted); }
 .run-pick { cursor: pointer; }
 .run-pick.active td { background: #17304a; }
 .scroll { max-height: 340px; overflow-y: auto; }
+.history-panel {
+  margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px;
+}
+.timeline {
+  list-style: none; margin: 8px 0 0; padding: 0 0 0 16px;
+  border-left: 2px solid var(--border);
+}
+.timeline li { position: relative; padding: 4px 0 10px 12px; font-size: 12px; }
+.timeline li::before {
+  content: ''; position: absolute; left: -21px; top: 10px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+}
+.timeline li.revise::before { background: var(--good); }
+.timeline li.clear::before { background: var(--warn); }
+.tl-idx { color: var(--muted); }
 .footer-note { color: var(--muted); font-size: 11px; padding: 8px 16px; border-top: 1px solid var(--border); }

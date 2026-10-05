@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import os
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from obspy import read
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -14,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from ..data import DATA_DIR
 from ..database import get_db
-from ..models.tables import Pick, Scenario, Station
-from ..schemas.dto import ManualPickIn, PickOut
+from ..models.tables import Pick, PickRevision, Scenario, Station
+from ..schemas.dto import ManualPickIn, PickOut, PickRevisionOut
 
 router = APIRouter(prefix="/api/scenarios", tags=["waveforms-picks"])
 
@@ -79,34 +80,84 @@ def picks_version(key: str, db: Session = Depends(get_db)):
 
 @router.patch("/picks/{pick_id}", response_model=PickOut)
 def revise_pick(pick_id: int, body: ManualPickIn, db: Session = Depends(get_db)):
-    """人工修订：只写 manual_* 字段，raw_* 永不改动。"""
-    from datetime import datetime, timezone
-
+    """人工修订：只写 manual_* 字段，raw_* 永不改动；每次操作追加一条记录。"""
     p = db.get(Pick, pick_id)
     if p is None:
         raise HTTPException(404, "拾取不存在")
-    p.manual_time_epoch = body.manual_time_epoch
-    p.manual_note = body.note
-    p.manual_author = body.author or "student"
-    p.manual_updated_at = datetime.now(timezone.utc)
+    old = p.manual_time_epoch
+    if body.manual_time_epoch is None:
+        # 传 null 等价于撤销：与 DELETE 行为一致，且同样留记录
+        _clear_manual(db, p, author=body.author, note=body.note or "撤销人工修订")
+    else:
+        _log_revision(db, p, "revise", old, body.manual_time_epoch,
+                      body.author, body.note)
+        p.manual_time_epoch = body.manual_time_epoch
+        p.manual_note = body.note
+        p.manual_author = body.author or "student"
+        p.manual_updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(p)
     return _pick_out(p)
 
 
 @router.delete("/picks/{pick_id}/manual", response_model=PickOut)
-def clear_manual_pick(pick_id: int, db: Session = Depends(get_db)):
-    """撤销人工修订，恢复使用原始拾取。"""
+def clear_manual_pick(
+    pick_id: int,
+    author: str = Query("student", max_length=64),
+    note: str = Query("撤销人工修订", max_length=500),
+    db: Session = Depends(get_db),
+):
+    """撤销人工修订，恢复使用原始拾取；撤销本身也留下一条记录。"""
     p = db.get(Pick, pick_id)
     if p is None:
         raise HTTPException(404, "拾取不存在")
+    _clear_manual(db, p, author=author, note=note)
+    db.commit()
+    db.refresh(p)
+    return _pick_out(p)
+
+
+def _clear_manual(db: Session, p: Pick, author: str, note: str) -> None:
+    """清除 manual_* 并记录撤销。当前没有人工修订时不产生空记录。"""
+    if p.manual_time_epoch is not None:
+        _log_revision(db, p, "clear", p.manual_time_epoch, None, author, note)
     p.manual_time_epoch = None
     p.manual_note = ""
     p.manual_author = ""
     p.manual_updated_at = None
-    db.commit()
-    db.refresh(p)
-    return _pick_out(p)
+
+
+def _log_revision(db: Session, p: Pick, action: str,
+                  old: Optional[float], new: Optional[float],
+                  author: str, note: str) -> None:
+    db.add(PickRevision(
+        pick_id=p.id, action=action,
+        old_time_epoch=old, new_time_epoch=new,
+        author=author or "student", note=note or "",
+    ))
+
+
+@router.get("/picks/{pick_id}/revisions", response_model=List[PickRevisionOut])
+def list_pick_revisions(pick_id: int, db: Session = Depends(get_db)):
+    """按拾取查看修订/撤销记录，按时间先后（主键）升序。"""
+    if db.get(Pick, pick_id) is None:
+        raise HTTPException(404, "拾取不存在")
+    rows = db.scalars(
+        select(PickRevision).where(PickRevision.pick_id == pick_id)
+        .order_by(PickRevision.id.asc())
+    ).all()
+    return [_revision_out(r) for r in rows]
+
+
+def _revision_out(r: PickRevision) -> PickRevisionOut:
+    ts = r.created_at
+    if ts.tzinfo is None:  # SQLite 读出为 naive datetime，按 UTC 解释
+        ts = ts.replace(tzinfo=timezone.utc)
+    return PickRevisionOut(
+        id=r.id, pick_id=r.pick_id, action=r.action,
+        old_time_epoch=r.old_time_epoch, new_time_epoch=r.new_time_epoch,
+        author=r.author, note=r.note, created_at_epoch=ts.timestamp(),
+    )
 
 
 @router.get("/{key}/waveforms/{station_code}")

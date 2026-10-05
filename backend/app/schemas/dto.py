@@ -65,6 +65,19 @@ class ManualPickIn(BaseModel):
     author: str = "student"
 
 
+class PickRevisionOut(BaseModel):
+    """一条人工修订/撤销记录。old/new 为 manual 字段前后值（None 表示无人工修订，
+    即有效到时取 raw）。时间统一用 UTC 历元秒，与系统其它接口一致。"""
+    id: int
+    pick_id: int
+    action: str  # revise | clear
+    old_time_epoch: Optional[float]
+    new_time_epoch: Optional[float]
+    author: str
+    note: str
+    created_at_epoch: float
+
+
 class LocateRequest(BaseModel):
     scenario_key: str
     phase: str = Field(pattern="^[PpSs]$", description="单次定位只允许单一震相")

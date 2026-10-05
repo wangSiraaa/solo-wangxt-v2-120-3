@@ -26,6 +26,7 @@ export const api = {
     method: 'PATCH', body: JSON.stringify(body),
   }),
   clearManual: (id) => req(`/scenarios/picks/${id}/manual`, { method: 'DELETE' }),
+  pickRevisions: (id) => req(`/scenarios/picks/${id}/revisions`),
   locate: (body) => req('/scenarios/locate', {
     method: 'POST', body: JSON.stringify(body),
   }),

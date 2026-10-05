@@ -23,6 +23,7 @@ SciPy 做 Geiger 最小二乘拟合，PostgreSQL/PostGIS（开发时可回退 SQ
 | 离群到时案例 | outlier：S04 的 P 自动拾取人为 +2.5s，S06 的 S 缺测 |
 | 台站几乎共线案例 | collinear：6 台沿 NE-SW 走廊（L06 偏离仅 0.2 km），特征值比 >60000，误差椭圆沿弱方向拉长 |
 | 原始拾取与人工修订分开 | `picks.raw_*` 只读、永不修改；`manual_*` 独立字段，可撤销；波形上点击放置修订 |
+| 修订/撤销留痕 | `pick_revisions` 只增不改：每次修订/撤销记录拾取 ID、manual 前后值、作者、备注、时间；到时表旁按拾取查看时间线 |
 | 结果绑定模型与数据版本 | 每次运行记录 model_id、data_version、pick_schema_version、app_version，以及拾取内容哈希 `pick_data_version` 和完整输入快照 |
 | 重算可解释 | 修订拾取后哈希变化，旧候选标记「过期」并保留对比；快照可逐拾取复盘 |
 
@@ -71,6 +72,7 @@ GET  /api/scenarios/{key}/picks                 # raw 与 manual 分列 + 派生
 GET  /api/scenarios/{key}/picks/version         # 拾取内容哈希（修订即变化）
 PATCH /api/scenarios/picks/{id}                 # 写入人工修订（不动 raw）
 DELETE /api/scenarios/picks/{id}/manual         # 撤销修订
+GET  /api/scenarios/picks/{id}/revisions        # 该拾取的修订/撤销记录（按时间升序）
 GET  /api/scenarios/{key}/waveforms/{station}   # ObsPy 读 MiniSEED，降采样返回
 POST /api/scenarios/locate                      # 单震相定位，保存候选解（含快照/版本）
 GET  /api/scenarios/{key}/runs  /api/scenarios/runs/{id}
